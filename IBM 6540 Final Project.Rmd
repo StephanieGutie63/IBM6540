@@ -1,0 +1,130 @@
+---
+title: "Final Project"
+author: "Stephanie Gutierrez, Jessica Garcia, Krystal Lee"
+date: "`r Sys.Date()`"
+output: html_document
+format: 
+    html:
+      toc: true
+      toc-depth: 3
+      smooth-scroll: true
+      link-external-newwindow: true
+      section-container: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Student Performance Project
+
+Our group chose a Kaggle dataset called Student Performance dataset designed to examine the factors influencing academic student performance. This dataset consist of 10,000 student records, with each record containing information about various predictors and performance index.
+
+Kaggel Dataset Link: <https://www.kaggle.com/datasets/nikhil7280/student-performance-multiple-linear-regression>
+
+### Data Description
+
+Student Performance Dataset has 1000 observations of 6 variables
+
+-   HoursStudied: The total number of hours spend studying by each student
+
+-   PreviousScores: The score obtained by students in previous tests
+
+-   ExtracurricularActivities: Whether the student participates in extracurricular activities (Yes or No)
+
+-   SleepHours: The average number of hours of sleep the student had per day
+
+-   SampleQuestionPapersPracticed: The number of sample question papers the student practiced
+
+-   PerformanceIndex: A measure of the overall performance of each student
+
+## Cleaning Student Performance Data
+
+We cleaned the data by importing library models tidyverse, tidymodels, rio, and janitor. We set the seed to set.seed(123) to keep the same results.
+
+Using the the function import() from the rio libary we imported the downloaded data that we renamed to Student_Performance.csv into a new dataset called StudentData. Doing this we cleaned up the names using upper camel with all the variables. We then mutated the variable ExtracurricularActivities to Extracurriculars to shorten the name. We also made it into a categorical variable using 1 for Yes and 0 for No. We also mutated the variable SampleQuestionPapersPracticed into the name SamplePapers to be easier to code. We then selected the new variables HoursStudied, , PreviousScores, Extracurriculars, SleepHours, SamplePapers, PerformanceIndex. To make sure this was all done we showed the top six result of the dataset StudentData. Checking the summary() function we could see if there was any missing NA values and there were not. We then checked the str() function to make sure the Extracurriculars was changed to a integer instead of a character value. Finally we then used the write() funciton to save the new tidy data as "Student_Performance_Clean.csv" as a new downloadable excel file.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(rio)
+library(janitor)
+
+set.seed(123) #make sure we get the same result
+
+# Import and clean data
+StudentData <- import("Student_Performance.csv") |> #importing downloaded data 
+  clean_names("upper_camel") |>  # Capitalize variable names
+  mutate(Extracurriculars = if_else(ExtracurricularActivities == "Yes", 1L, 0L), #1L and )L ensures integer data types
+    SamplePapers = SampleQuestionPapersPracticed
+  ) |> #mutate chr to int as dummy var and clean names
+  select(HoursStudied, PreviousScores, Extracurriculars, SleepHours, SamplePapers, PerformanceIndex) #select correct variables
+  head(StudentData) #show the top 6 observations of the dataset to preview
+        
+  summary(StudentData) #will show if any NA values
+  str(StudentData) #chr should now be int 0 & 1 and new variable names
+  
+  write.csv(StudentData, "Student_Performance_Clean.csv", row.names = FALSE)#creates new csv with tidy data
+  
+```
+
+## Variables
+
+-   Predictor Variables (Independent Variables): HoursStudied, PrevoiusScores, Extracurriculars, SleepHours, SamplePapers
+
+-   Outcome Variable(Dependent Variable): Performance Index
+
+## Machine Learning Algorithm
+
+The machine learning algorithm we chose was Random Forest Model.
+
+```{r message=FALSE, warning=FALSE}
+# Split data into training and testing sets
+splitStudentData <- initial_split(StudentData, prop = 0.8, strata = PerformanceIndex)
+DataTrain <- training(splitStudentData)
+DataTest <- testing(splitStudentData)
+
+# Create a recipe
+RecipeStudent <- recipe(PerformanceIndex ~ HoursStudied + PreviousScores + Extracurriculars + SleepHours + SamplePapers, data = DataTrain) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_naomit()
+
+# Specify Random Forest model
+ModelStudent <- rand_forest(mtry = 2, trees = 500, min_n = 5) |>
+  set_engine("ranger") |>
+  set_mode("regression")
+
+# Create a workflow
+WFStudent <- workflow() |>
+  add_model(ModelStudent) %>%
+  add_recipe(RecipeStudent)
+
+# Fit the model
+FitStudent <- fit(WFStudent, data = DataTrain)
+
+# Predict on test set
+PredictStudent <- predict(FitStudent, DataTest) |>
+  bind_cols(DataTest |> select(PerformanceIndex))
+
+# Evaluate
+metrics <- PredictStudent |>
+  metrics(truth = PerformanceIndex, estimate = .pred)
+
+print(metrics)
+```
+
+## RMSE
+
+The Random Forest model demonstrated strong predictive accuracy, as reflected in its Root Mean Squared Error (RMSE) of 2.37. This means that on average, the model’s predicted student scores deviate by only 2.37 points from the actual scores. A low RMSE indicates that the model consistently produces close estimates and avoids large prediction errors. These results suggest that the model is highly reliable in estimating student performance and can be trusted to make accurate predictions across a range of academic profiles.
+
+## RSQ
+
+The Random Forest model demonstrated exceptional predictive performance on the test dataset. The model achieved an R² value of 0.986, indicating that it explains approximately 98.6% of the variation in student performance based on study hours, previous scores, extracurricular participation, sleep hours, and practice papers.
+
+## MAE
+
+The Mean Absolute Error (MAE) of 1.88. These results suggest that the model provides highly accurate predictions and effectively captures the key factors influencing student performance.
+
+## Conclusion
+
+Our analysis of the Student Performance dataset reveals that academic performance can be predicted with high accuracy using factors such as hours studied, previous test scores, participation in extracurricular activities, average sleep hours, and the number of practice papers completed. The Random Forest model’s outstanding results explaining nearly all variation in performance and maintaining prediction errors within roughly 2 points highlight the strong relationship between these predictors and overall student success. These findings suggest that a balanced approach combining consistent study habits, adequate rest, and targeted practice can significantly enhance academic outcomes. This model could be a valuable tool for educators and policymakers to identify at-risk students and implement strategies to improve performance.
